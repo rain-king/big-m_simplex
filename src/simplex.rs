@@ -3,8 +3,7 @@ use crate::simplex_args::{A, B, Z};
 use crate::ndarray_io::pretty_print_array2;
 use ndarray::{concatenate, s, Array1 as vector, Array2 as matrix, Axis};
 
-pub fn big_m_simplex(z: Z, a_matrix: A, b: B) -> Vec<(usize, usize)> {
-	let mut basis: Vec<(usize, usize)> = Vec::new();
+pub fn big_m_simplex(z: Z, a_matrix: A, b: B) {
 	let mut tableau = original_tableau(&z, &a_matrix, &b);
 	
 	println!();
@@ -14,12 +13,31 @@ pub fn big_m_simplex(z: Z, a_matrix: A, b: B) -> Vec<(usize, usize)> {
 
 	tableau = initialize(&z, &a_matrix, &b);
 	
-	basis = iterations(&mut tableau);
+	let basis = iterations(&mut tableau);
 	println!("The final tableau is:");
 	pretty_print_array2(&tableau);
 	println!();
 
-	basis
+	let objective_value = if z.maximize {
+		tableau[(0,tableau.ncols() - 1)]
+	} else {
+		-tableau[(0,tableau.ncols() - 1)]
+	};
+	println!("The optimal objective value is: {objective_value}");
+	
+	let mut solution: Vec<(usize, f64)> = basis.iter()
+		.map(|x|
+			(x.1 + 1, tableau.column(tableau.ncols() - 1)[x.0])
+		).collect();
+	solution.sort_by_key(|&(i, _)| i);
+	println!("The optimal solution is given by the decision variables with values:");
+	for i in 1..=z.c.ncols() {
+		if solution.iter().any(|x| x.0 == i) {
+			println!("x_{i} = {}", solution.iter().find(|&&(index, _)| index == i).unwrap().1)
+		} else {
+			println!("x_{i} = 0");
+		}
+	}
 }
 
 fn original_tableau(z: &Z, a_matrix: &A, b: &B) -> matrix<f64> {
@@ -61,7 +79,10 @@ fn initialize(z: &Z, a: &A, b: &B) -> matrix<f64> {
 	];
 	let mut tableau = concatenate![Axis(0), tableau_top, tableau_bottom];
 	
-	let big_m = tableau.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap()*10.0;
+	let big_m = tableau.iter()
+		.map(|&x| x.abs())
+		.max_by(|a, b| a.partial_cmp(b).unwrap())
+		.unwrap()*100.0;
 
 	if !only_leq_constraints {
 		let artificials_column_index_start = tableau_top.ncols() - 1 - (n_geq_ineqs + a.eq.nrows());
@@ -185,7 +206,7 @@ fn iterations(tableau: &mut matrix<f64>) -> Vec<(usize, usize)> {
 		}
 
 		println!("Iteration {iteration}");
-		pretty_print_array2(&tableau);
+		pretty_print_array2(tableau);
 		println!();
 
 		iteration += 1;
@@ -243,7 +264,7 @@ fn pivot(tableau: &mut matrix<f64>) -> (usize, usize) {
 fn pivot_indexes(tableau: &mut matrix<f64>) -> (usize, usize) {
 	let pivot_column_index = argmin(tableau.row(0).slice(s![..-1]).to_owned());
 
-	let mut pivot_row_index = 0 as usize;
+	let mut pivot_row_index = 0;
 	let mut minimum = f64::INFINITY;
 	for (i, pivot_value) in tableau.column(pivot_column_index).into_iter().enumerate() {
 		if i > 0 {
