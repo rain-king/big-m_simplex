@@ -34,6 +34,7 @@ fn main() {
 	"then press Return again."));
 
 	let b_eq = io::read_column("Enter the b_eq column values separated by spaces.");
+	println!();
 
 	let z = Z {
 		maximize,

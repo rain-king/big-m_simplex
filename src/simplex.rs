@@ -83,6 +83,9 @@ fn initialize(z: &Z, a: &A, b: &B) -> matrix<f64> {
 		.map(|&x| x.abs())
 		.max_by(|a, b| a.partial_cmp(b).unwrap())
 		.unwrap()*100.0;
+	
+	println!("M = {big_m}");
+	println!();
 
 	if !only_leq_constraints { // add big m to artificials
 		let tableau_top_ncols = tableau_top.ncols();
