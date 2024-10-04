@@ -6,10 +6,10 @@ use ndarray::{concatenate, s, Array1 as vector, Array2 as matrix, Axis};
 pub fn big_m_simplex(z: Z, a_matrix: A, b: B) {
 	let mut tableau = original_tableau(&z, &a_matrix, &b);
 	
-	println!();
-	println!("The initial tableau is:");
-	pretty_print_array2(&tableau);
-	println!();
+	// println!();
+	// println!("The initial tableau is:");
+	// pretty_print_array2(&tableau);
+	// println!();
 
 	tableau = initialize(&z, &a_matrix, &b);
 	
@@ -84,9 +84,9 @@ fn initialize(z: &Z, a: &A, b: &B) -> matrix<f64> {
 		.max_by(|a, b| a.partial_cmp(b).unwrap())
 		.unwrap()*100.0;
 
-	if !only_leq_constraints {
-		let artificials_column_index_start = tableau_top.ncols() - 1 - (n_geq_ineqs + a.eq.nrows());
+	if !only_leq_constraints { // add big m to artificials
 		let tableau_top_ncols = tableau_top.ncols();
+		let artificials_column_index_start = tableau_top_ncols - 1 - (n_geq_ineqs + n_eqs);
 		tableau_top
 			.columns_mut()
 			.into_iter()
@@ -94,7 +94,7 @@ fn initialize(z: &Z, a: &A, b: &B) -> matrix<f64> {
 			.filter(|(j, _)| artificials_column_index_start <= *j && *j < tableau_top_ncols - 1)
 			.for_each(|(_, column)|
 				for value in column {
-					*value = if z.maximize {-big_m} else {big_m};
+					*value = if z.maximize {big_m} else {-big_m};
 				}
 			);
 			tableau = concatenate![Axis(0), tableau_top, tableau_bottom];
@@ -136,7 +136,7 @@ fn initialize(z: &Z, a: &A, b: &B) -> matrix<f64> {
 				.row_mut(0)
 				.iter_mut()
 				.zip(pivot_row.iter())
-				.for_each(|(value, &pivot_value)| *value += if z.maximize {pivot_value*big_m} else {-pivot_value*big_m});
+				.for_each(|(value, &pivot_value)| *value += if z.maximize {-pivot_value*big_m} else {pivot_value*big_m});
 		}
 	}
 	
@@ -195,8 +195,12 @@ fn get_geq_artificials(b: &B) -> matrix<f64> {
 fn iterations(tableau: &mut matrix<f64>) -> Vec<(usize, usize)> {
 	let mut basis = initialize_basis(tableau.to_owned());
 
-	let mut iteration = 1;
+	let mut iteration = 0;
 	while not_optimal(tableau) {
+		println!("Iteration {iteration}");
+		pretty_print_array2(tableau);
+		println!();
+
 		let (pivot_row_index, pivot_column_index) = pivot(tableau);
 		for element in basis.iter_mut() {
 			// variable with pivot column enters, variable with pivot row exits
@@ -204,10 +208,6 @@ fn iterations(tableau: &mut matrix<f64>) -> Vec<(usize, usize)> {
 				*element = (pivot_row_index, pivot_column_index);
 			}
 		}
-
-		println!("Iteration {iteration}");
-		pretty_print_array2(tableau);
-		println!();
 
 		iteration += 1;
 	}
